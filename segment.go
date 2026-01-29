@@ -175,8 +175,11 @@ func (s *segment) Close() error {
 	if s.closed {
 		return nil
 	}
+	if err := s.fd.Close(); err != nil {
+		return err
+	}
 	s.closed = true
-	return s.fd.Close()
+	return nil
 }
 
 // Size returns the size of the segment file.
@@ -406,10 +409,9 @@ func (s *segment) readInternal(blockNumber uint32, chunkOffset int64) ([]byte, *
 	} else {
 		block = *getBlockBuf()
 
-		if cap(block) < blockSize {
+		if len(block) != blockSize {
 			block = make([]byte, blockSize)
 		}
-		block = block[:blockSize]
 		defer putBlockBuf(&block)
 	}
 readLoop:
@@ -439,7 +441,7 @@ readLoop:
 				s.startupBlock.blockNumber = int64(blockNumber)
 			}
 		} else {
-			_, err := s.fd.ReadAt(block[0:size], chunkOffset)
+			_, err := s.fd.ReadAt(block[0:size], blockOff)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -532,9 +534,9 @@ func (cp *ChunkPosition) encode(shrink bool) []byte {
 	return buf
 }
 
-// Decode decodes the chunk position from a byte slice; returns a pointer to a
+// DecodeChunkPosition decodes the chunk position from a byte slice; returns a pointer to a
 // new ChunkPosition.
-func (cp *ChunkPosition) Decode(buf []byte) *ChunkPosition {
+func DecodeChunkPosition(buf []byte) *ChunkPosition {
 	if len(buf) == 0 {
 		return nil
 	}
