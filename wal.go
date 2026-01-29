@@ -13,8 +13,8 @@ import (
 const initialSegmentFileId = 1
 
 var (
-	ErrValueTooLarge       = errors.New("wal: the data size can't be larger than segment size")
-	ErrPendingSizeTooLarge = errors.New("wal: the upper bound of pending writes can't be larger than segment size")
+	ErrValueTooLarge       = errors.New("the data size can't be larger than segment size")
+	ErrPendingSizeTooLarge = errors.New("the upper bound of pending writes can't be larger than segment size")
 )
 
 // Wal represents a Write-Ahead Log structure that provides durability

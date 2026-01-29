@@ -23,8 +23,8 @@ const (
 )
 
 var (
-	ErrClosed       = errors.New("wal: the segment file is closed")
-	ErrInvalidCrc32 = errors.New("wal: invalid CRC, the data may be corrupted")
+	ErrClosed       = errors.New("the segment file is closed")
+	ErrInvalidCrc32 = errors.New("invalid CRC, the data may be corrupted")
 )
 
 const (
