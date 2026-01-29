@@ -238,11 +238,10 @@ func (s *segment) writeToBuffer(data []byte, chunkBuffer *[]byte) (*ChunkPositio
 			pad := make([]byte, blockSize-s.currentBlockSize)
 			*chunkBuffer = append(*chunkBuffer, pad...)
 			padding += blockSize - s.currentBlockSize
-
-			// start from a new block
-			s.currentBlockSize = 0
-			s.currentBlockNumber += 1
 		}
+		// start from a new block
+		s.currentBlockSize = 0
+		s.currentBlockNumber += 1
 	}
 	// return the start position of the chunk that the user can use to read the data.
 	pos := &ChunkPosition{
