@@ -191,8 +191,8 @@ func (wal *Wal) SetIsStartupTraversal(val bool) {
 // read the data from the segment file whose id is less than or equal to the
 // given segId.
 func (wal *Wal) NewReaderWithMax(segId SegmentId) *Reader {
-	wal.mu.Lock()
-	defer wal.mu.Unlock()
+	wal.mu.RLock()
+	defer wal.mu.RUnlock()
 
 	var segReaders []*segmentReader
 
@@ -227,8 +227,8 @@ func (wal *Wal) NewReaderWithStart(startPos *ChunkPosition) (*Reader, error) {
 	if startPos == nil {
 		return nil, errors.New("start position cannot be nil")
 	}
-	wal.mu.Lock()
-	defer wal.mu.Unlock()
+	wal.mu.RLock()
+	defer wal.mu.RUnlock()
 
 	reader := wal.NewReader()
 	for {
