@@ -411,7 +411,7 @@ func (s *segment) readInternal(blockNumber uint32, chunkOffset int64) ([]byte, *
 		return nil, nil, ErrClosed
 	}
 	var (
-		result []byte
+		result = make([]byte, 0, blockSize)
 		block  []byte
 
 		segSize   = s.Size()
