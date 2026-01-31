@@ -463,10 +463,10 @@ readLoop:
 			header    = block[chunkOffset : chunkOffset+chunkHeaderSize] // Header
 			dataLen   = binary.LittleEndian.Uint16(header[4:6])          // Length
 			chunkType = header[6]                                        // Type
-			startIdx  = chunkOffset + chunkHeaderSize                    // Payload
+			startIdx  = chunkOffset + chunkHeaderSize                    // Payload Idx
 		)
-		// CheckSum
 		result = append(result, block[startIdx:startIdx+int64(dataLen)]...)
+		// CheckSum
 		var (
 			checksumEndIdx = chunkOffset + chunkHeaderSize + int64(dataLen)
 			currChecksum   = crc32.ChecksumIEEE(block[chunkOffset+4 : checksumEndIdx])
