@@ -386,12 +386,26 @@ func (s *segment) writeChunkBuffer(chunkBuffer *[]byte) error {
 	return nil
 }
 
-// Read reads the data from the segment file by the block number and chunk offset.
+// Read reads the data from the segment file by the block number and chunk
+// offset.
 func (s *segment) Read(blockNumber uint32, chunkOffset int64) ([]byte, error) {
 	value, _, err := s.readInternal(blockNumber, chunkOffset)
 	return value, err
 }
 
+// readInternal reads and assembles a logical record starting at the given
+// (blockNumber, chunkOffset). A record may span multiple chunks and blocks;
+// the method advances across blocks until a ChunkTypeFull or ChunkTypeLast
+// is encountered, which marks the end of the logical record.
+//
+// It returns:
+//   - the reconstructed record payload
+//   - the next ChunkPosition from which the following read should continue
+//   - io.EOF if there is no more readable data in the segment
+//
+// During startup traversal, a shared startupBlock buffer may be reused to
+// avoid redundant disk reads; otherwise data is read directly from disk.
+// Each chunk's payload is verified using its stored checksum.
 func (s *segment) readInternal(blockNumber uint32, chunkOffset int64) ([]byte, *ChunkPosition, error) {
 	if s.closed {
 		return nil, nil, ErrClosed
