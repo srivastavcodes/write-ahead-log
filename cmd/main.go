@@ -2,23 +2,39 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"wal"
 )
 
 func main() {
-	lorem := `
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus. 
-Suspendisse lectus tortor, dignissim sit amet, adipiscing nec, ultricies 
-sed, dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius 
-a, semper congue, euismod non, mi.
-`
-	var b strings.Builder
-	fmt.Println("start")
-	for b.Len() < 32761 {
-		b.WriteString(lorem)
-		b.WriteString(" ")
+	waLog, _ := wal.Open(wal.DefaultOptions)
+	defer func() {
+		_ = waLog.Delete()
+	}()
+
+	// writing data to log
+	pos1, _ := waLog.Write([]byte("example data one"))
+	pos2, _ := waLog.Write([]byte("example data two"))
+
+	// reading data sequentially
+	data1, _ := waLog.Read(pos1)
+	fmt.Printf("data1: %s\n", data1)
+
+	data2, _ := waLog.Read(pos2)
+	fmt.Printf("data1: %s\n", data2)
+
+	fmt.Println()
+
+	_, _ = waLog.Write([]byte("example data 3"))
+	_, _ = waLog.Write([]byte("example data 4"))
+	_, _ = waLog.Write([]byte("example data 5"))
+	_, _ = waLog.Write([]byte("example data 6"))
+
+	reader := waLog.NewReader()
+	for {
+		data, pos, err := reader.Next()
+		if err != nil {
+			break
+		}
+		fmt.Printf("pos: %v, data: %s\n", pos, data)
 	}
-	payload := b.String()[:32761]
-	fmt.Println(payload)
-	fmt.Println("end")
 }
