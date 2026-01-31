@@ -9,7 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"wal/bufpool"
+
+	"github.com/valyala/bytebufferpool"
 )
 
 type SegmentId = uint32
@@ -85,26 +86,24 @@ type ChunkPosition struct {
 
 var blockPool = sync.Pool{
 	New: func() any {
-		b := make([]byte, blockSize)
-		return &b
+		return make([]byte, blockSize)
 	},
 }
 
-// getBlockBuf returns a pointer to a byte slice from the buffer pool.
+// getBlockBuf returns a byte slice from the buffer pool.
 // The returned slice has length 0 and can be appended to.
-func getBlockBuf() *[]byte {
-	b := blockPool.Get().(*[]byte)
-	return b
+func getBlockBuf() []byte {
+	return blockPool.Get().([]byte)
 }
 
 // putBlockBuf returns a byte slice to the buffer pool for reuse.
 // If the slice capacity is too large, it is reset to a smaller
 // buffer to avoid retaining excessive memory.
-func putBlockBuf(b *[]byte) {
-	if cap(*b) > 256*1024 {
-		*b = make([]byte, blockSize)
+func putBlockBuf(buf []byte) {
+	if cap(buf) > 256*1024 {
+		return
 	}
-	blockPool.Put(b)
+	blockPool.Put(buf[:0])
 }
 
 // openSegment opens a new segment.
@@ -198,13 +197,13 @@ func (s *segment) Write(data []byte) (pos *ChunkPosition, err error) {
 		originalBlockNumber = s.currentBlockNumber
 		originalBlockSize   = s.currentBlockSize
 	)
-	chunkBuffer := bufpool.GetFromBuf()
+	chunkBuffer := bytebufferpool.Get()
 	defer func() {
 		if err != nil {
 			s.currentBlockNumber = originalBlockNumber
 			s.currentBlockSize = originalBlockSize
 		}
-		bufpool.PutIntoBuf(chunkBuffer)
+		bytebufferpool.Put(chunkBuffer)
 	}()
 	pos, err = s.writeToBuffer(data, chunkBuffer)
 	if err != nil {
@@ -223,9 +222,9 @@ func (s *segment) Write(data []byte) (pos *ChunkPosition, err error) {
 //
 // Each chunk has a header and payload, and the header contains the checksum, length,
 // and type. The payload of the chunk is the real data you want to write.
-func (s *segment) writeToBuffer(data []byte, chunkBuffer *[]byte) (*ChunkPosition, error) {
+func (s *segment) writeToBuffer(data []byte, chunkBuffer *bytebufferpool.ByteBuffer) (*ChunkPosition, error) {
 	var (
-		startBufferLen = len(*chunkBuffer)
+		startBufferLen = chunkBuffer.Len()
 		padding        = uint32(0)
 	)
 	if s.closed {
@@ -236,7 +235,7 @@ func (s *segment) writeToBuffer(data []byte, chunkBuffer *[]byte) (*ChunkPositio
 		// padding if necessary
 		if s.currentBlockSize < blockSize {
 			pad := make([]byte, blockSize-s.currentBlockSize)
-			*chunkBuffer = append(*chunkBuffer, pad...)
+			chunkBuffer.B = append(chunkBuffer.B, pad...)
 			padding += blockSize - s.currentBlockSize
 		}
 		// start from a new block
@@ -292,7 +291,7 @@ func (s *segment) writeToBuffer(data []byte, chunkBuffer *[]byte) (*ChunkPositio
 		pos.ChunkSize = blockCount*chunkHeaderSize + dataSize
 	}
 	// the buffer length must be equal to chunkSize + padding length
-	endBufferLen := len(*chunkBuffer)
+	endBufferLen := chunkBuffer.Len()
 
 	if pos.ChunkSize+padding != uint32(endBufferLen-startBufferLen) {
 		return nil, fmt.Errorf(
@@ -324,14 +323,15 @@ func (s *segment) writeAll(data [][]byte) (positions []*ChunkPosition, err error
 		originalBlockSize   = s.currentBlockSize
 	)
 	// init chunk buffer
-	chunkBuffer := bufpool.GetFromBuf()
+	chunkBuffer := bytebufferpool.Get()
+	chunkBuffer.Reset()
 	// restores original status
 	defer func() {
 		if err != nil {
 			s.currentBlockNumber = originalBlockNumber
 			s.currentBlockSize = originalBlockSize
 		}
-		bufpool.PutIntoBuf(chunkBuffer)
+		bytebufferpool.Put(chunkBuffer)
 	}()
 	pos := new(ChunkPosition)
 
@@ -355,7 +355,7 @@ func (s *segment) writeAll(data [][]byte) (positions []*ChunkPosition, err error
 // data, len of data, and the ChunkType.
 //
 // | CRC (4B) | Length (2B) | Type (1B) |  Payload  |
-func (s *segment) appendChunkBuffer(chunkBuffer *[]byte, data []byte, chunkType ChunkType) {
+func (s *segment) appendChunkBuffer(chunkBuffer *bytebufferpool.ByteBuffer, data []byte, chunkType ChunkType) {
 	// Length: 2 bytes index:[4-5]
 	binary.LittleEndian.PutUint16(s.header[4:6], uint16(len(data)))
 	// Type: 1 byte index:[6]
@@ -366,18 +366,18 @@ func (s *segment) appendChunkBuffer(chunkBuffer *[]byte, data []byte, chunkType 
 	// CheckSum: 4 bytes index:[0-3]
 	binary.LittleEndian.PutUint32(s.header[:4], sum)
 	// append the header and data to segment chunk buffer.
-	*chunkBuffer = append(*chunkBuffer, s.header...)
-	*chunkBuffer = append(*chunkBuffer, data...)
+	chunkBuffer.B = append(chunkBuffer.B, s.header...)
+	chunkBuffer.B = append(chunkBuffer.B, data...)
 }
 
 // writeChunkBuffer writes the data in the buffer to the segment file, and
 // invalidates the startupBlock cache.
-func (s *segment) writeChunkBuffer(chunkBuffer *[]byte) error {
+func (s *segment) writeChunkBuffer(chunkBuffer *bytebufferpool.ByteBuffer) error {
 	if s.currentBlockSize > blockSize {
 		return errors.New("the current block size exceeds the maximum block size")
 	}
 	// write the data to the underlying file.
-	_, err := s.fd.Write(*chunkBuffer)
+	_, err := s.fd.Write(chunkBuffer.Bytes())
 	if err != nil {
 		return err
 	}
@@ -420,12 +420,14 @@ func (s *segment) readInternal(blockNumber uint32, chunkOffset int64) ([]byte, *
 	if s.isStartupTraversal {
 		block = s.startupBlock.block
 	} else {
-		block = *getBlockBuf()
+		block = getBlockBuf()
 
-		if len(block) != blockSize {
+		if cap(block) < blockSize {
 			block = make([]byte, blockSize)
 		}
-		defer putBlockBuf(&block)
+		block = block[:blockSize]
+
+		defer putBlockBuf(block)
 	}
 readLoop:
 	for {
