@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/srivastavcodes/wal"
 )
 
 func main() {

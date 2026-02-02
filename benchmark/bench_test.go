@@ -6,8 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/srivastavcodes/wal"
-
 	"github.com/stretchr/testify/require"
 )
 

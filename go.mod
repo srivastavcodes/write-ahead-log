@@ -1,4 +1,4 @@
-module github.com/srivastavcodes/wal
+module github.com/srivastavcodes/write-ahead-log
 
 go 1.25
 
