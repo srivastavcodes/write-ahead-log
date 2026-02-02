@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"wal"
+
+	"github.com/srivastavcodes/wal"
 )
 
 func main() {

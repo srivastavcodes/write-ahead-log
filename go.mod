@@ -1,4 +1,4 @@
-module wal
+module github.com/srivastavcodes/wal
 
 go 1.25
 

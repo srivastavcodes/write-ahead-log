@@ -5,7 +5,8 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"wal"
+
+	"github.com/srivastavcodes/wal"
 
 	"github.com/stretchr/testify/require"
 )
