@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+
+	wal "github.com/srivastavcodes/write-ahead-log"
 )
 
 func main() {

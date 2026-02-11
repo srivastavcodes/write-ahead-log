@@ -1,6 +1,11 @@
 package wal
 
-import "time"
+import (
+	"fmt"
+	"math/rand"
+	"path/filepath"
+	"time"
+)
 
 const (
 	B  = 1
@@ -44,11 +49,15 @@ type Options struct {
 	SyncInterval time.Duration
 }
 
-var DefaultOptions = Options{
-	DirPath:        "./",
-	SegmentSize:    1 * GB,
-	SegmentFileExt: ".SEG",
-	Sync:           false,
-	BytesPerSync:   0,
-	SyncInterval:   0,
+func walTempDir() string {
+	return filepath.Join("./", fmt.Sprintf("wal%d", randomName.Int63()))
 }
+
+var DefaultOptions = Options{
+	DirPath:     walTempDir(),
+	SegmentSize: 1 * GB, SegmentFileExt: ".SEG",
+	Sync:         false,
+	BytesPerSync: 0, SyncInterval: 0,
+}
+
+var randomName = rand.NewSource(time.Now().UnixNano())

@@ -118,6 +118,7 @@ func openSegment(dirPath, extName string, id uint32) (*segment, error) {
 	// set the current block number and block size
 	offset, err := fd.Seek(0, io.SeekEnd)
 	if err != nil {
+		_ = fd.Close()
 		return nil, fmt.Errorf("seek to the end of segment file %d%s failed: %v", id, extName, err)
 	}
 	seg := &segment{

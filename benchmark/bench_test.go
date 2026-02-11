@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	wal "github.com/srivastavcodes/write-ahead-log"
 	"github.com/stretchr/testify/require"
 )
 
