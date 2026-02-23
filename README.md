@@ -101,5 +101,4 @@ func main() {
 
 ## Status
 
-This is a learning project. As a result, it focuses on correctness and clarity
-over production features, and the API may change as the implementation evolves.
+The API may change as the implementation evolves, as I am still learning about wals and db internals in general, so if I find something worth adding - I will. Although I will try not to break pre-existing Api.
