@@ -86,21 +86,21 @@ type ChunkPosition struct {
 
 var blockPool = sync.Pool{
 	New: func() any {
-		return make([]byte, blockSize)
+		return make([]byte, 0, blockSize)
 	},
 }
 
 // getBlockBuf returns a byte slice from the buffer pool.
 // The returned slice has length 0 and can be appended to.
 func getBlockBuf() []byte {
-	return blockPool.Get().([]byte)
+	return blockPool.Get().([]byte)[:0]
 }
 
 // putBlockBuf returns a byte slice to the buffer pool for reuse.
 // If the slice capacity is too large, it is reset to a smaller
 // buffer to avoid retaining excessive memory.
 func putBlockBuf(buf []byte) {
-	if cap(buf) > 256*1024 {
+	if cap(buf) > 4*blockSize {
 		return
 	}
 	blockPool.Put(buf[:0])
@@ -259,35 +259,41 @@ func (s *segment) writeToBuffer(data []byte, chunkBuffer *bytebufferpool.ByteBuf
 		// the data should be written to the block in batches.
 		var (
 			blockCount    uint32 = 0
-			leftSize             = dataSize
+			remaining            = dataSize
 			currBlockSize        = s.currentBlockSize
 		)
-		for leftSize > 0 {
-			chunkSize := blockSize - currBlockSize - chunkHeaderSize
-			if chunkSize > leftSize {
-				chunkSize = leftSize
+		for remaining > 0 {
+			available := blockSize - currBlockSize - chunkHeaderSize
+			if available > remaining {
+				available = remaining
 			}
-			end := dataSize - leftSize + chunkSize
-			if end > dataSize {
-				end = dataSize
-			}
+			// starting index of the remaining chunk cause if 10 is size and
+			// 8 is still left, and you've written 2, 10-8 is the index = 2
+			// from where you'll continue your writing.
+			startIdx := dataSize - remaining
+			// ending index is till where can we append; also it's adding
+			// available because available will be either at the block end
+			// or, because of the if block above, it'll be where the chunk
+			// ends. So logically the end is from starting of the remaining
+			// chunk to the amount being appended.
+			endIdx := startIdx + available
+
 			// append the chunks to the buffer.
 			var chunkType ChunkType
-
-			switch leftSize {
+			switch remaining {
 			case dataSize:
 				chunkType = ChunkTypeFirst
-			case chunkSize:
+			case available:
 				chunkType = ChunkTypeLast
 			default:
 				chunkType = ChunkTypeMiddle
 			}
-			s.appendChunkBuffer(chunkBuffer, data[dataSize-leftSize:end], chunkType)
+			s.appendChunkBuffer(chunkBuffer, data[startIdx:endIdx], chunkType)
 
-			leftSize -= chunkSize
+			remaining -= available
 			blockCount++
 
-			currBlockSize = (currBlockSize + chunkSize + chunkHeaderSize) % blockSize
+			currBlockSize = (currBlockSize + available + chunkHeaderSize) % blockSize
 		}
 		pos.ChunkSize = blockCount*chunkHeaderSize + dataSize
 	}
