@@ -264,9 +264,7 @@ func (s *segment) writeToBuffer(data []byte, chunkBuffer *bytebufferpool.ByteBuf
 		)
 		for remaining > 0 {
 			available := blockSize - currBlockSize - chunkHeaderSize
-			if available > remaining {
-				available = remaining
-			}
+			available = min(available, remaining)
 			// starting index of the remaining chunk cause if 10 is size and
 			// 8 is still left, and you've written 2, 10-8 is the index = 2
 			// from where you'll continue your writing.
